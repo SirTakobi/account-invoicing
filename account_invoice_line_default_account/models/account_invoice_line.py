@@ -1,70 +1,55 @@
 # -*- coding: UTF-8 -*-
-'''
-Created on 30 jan. 2013
+# Copyright 2012 Therp BV (<http://therp.nl>)
+# Copyright 2013-2018 BCIM SPRL (<http://www.bcim.be>)
 
-@author: Ronald Portier, Therp
-@contributor: Jacques-Etienne Baudoux, BCIM
-'''
-
-from openerp.osv import orm
-from openerp.tools.translate import _
+from odoo import api, fields, models, _
 
 
-class account_invoice_line(orm.Model):
+class AccountInvoiceLine(models.Model):
     _inherit = 'account.invoice.line'
 
-    def _account_id_default(self, cr, uid, context=None):
-        if context is None:
-            context = {}
-        partner_id = context.get('partner_id')
+    def _account_id_default(self):
+        partner_id = self._context.get('partner_id')
         if not partner_id:
-            return False
-        assert isinstance(partner_id, (int, long)), (
+            return self._default_account()
+        assert isinstance(partner_id, int), (
             _('No valid id for context partner_id %d') % partner_id)
-        invoice_type = context.get('type')
-        partner_model = self.pool.get('res.partner')
+        invoice_type = self._context.get('type')
         if invoice_type in ['in_invoice', 'in_refund']:
-            partner = partner_model.read(
-                cr, uid, partner_id,
-                ['property_account_expense'], context=context)
-            return partner['property_account_expense']
+            partner = self.env['res.partner'].browse(partner_id)
+            if partner.property_account_expense:
+                return partner.property_account_expense.id
         elif invoice_type in ['out_invoice', 'out_refund']:
-            partner = partner_model.read(
-                cr, uid, partner_id,
-                ['property_account_income'], context=context)
-            return partner['property_account_income']
-        return False
+            partner = self.env['res.partner'].browse(partner_id)
+            if partner.property_account_income:
+                return partner.property_account_income.id
+        return self._default_account()
 
-    _defaults = {
-        'account_id': _account_id_default,
-    }
+    account_id = fields.Many2one(default=_account_id_default)
 
-    def onchange_account_id(
-            self, cr, uid, ids, product_id, partner_id, inv_type,
-            fposition_id, account_id, context=None):
-        if account_id and partner_id and not product_id:
-            # We have a manually entered account_id (no product_id, so the
-            # account_id is not the result of a product selection).
-            # Store this account_id as future default in res_partner.
-            partner_model = self.pool.get('res.partner')
-            partner = partner_model.read(
-                cr, uid, partner_id,
-                ['auto_update_account_expense', 'property_account_expense',
-                 'auto_update_account_income', 'property_account_income'],
-                context=context)
-            vals = {}
-            if (inv_type in ['in_invoice', 'in_refund'] and
-                    partner['auto_update_account_expense']):
-                if account_id != partner['property_account_expense']:
-                    # only write when something really changed
-                    vals.update({'property_account_expense': account_id})
-            elif (inv_type in ['out_invoice', 'out_refund'] and
-                    partner['auto_update_account_income']):
-                if account_id != partner['property_account_income']:
-                    # only write when something really changed
-                    vals.update({'property_account_income': account_id})
-            if vals:
-                partner_model.write(cr, uid, partner_id, vals, context=context)
-        return super(account_invoice_line, self).onchange_account_id(
-            cr, uid, ids, product_id, partner_id, inv_type,
-            fposition_id, account_id)
+    @api.onchange('account_id')
+    def _onchange_account_id(self):
+        if not self.account_id or not self.partner_id or self.product_id:
+            return super(AccountInvoiceLine, self)._onchange_account_id()
+        if self._context.get('journal_id'):
+            journal = self.env['account.journal'].browse(
+                self._context.get('journal_id'))
+            if self.account_id in [
+                    journal.default_credit_account_id,
+                    journal.default_debit_account_id]:
+                return super(AccountInvoiceLine, self)._onchange_account_id()
+        # We have a manually entered account_id (no product_id, so the
+        # account_id is not the result of a product selection).
+        # Store this account_id as future default in res_partner.
+        inv_type = self._context.get('type', 'out_invoice')
+        if (inv_type in ['in_invoice', 'in_refund'] and
+                self.partner_id.auto_update_account_expense):
+            if self.account_id != self.partner_id.property_account_expense:
+                self.partner_id.write({
+                    'property_account_expense': self.account_id.id})
+        elif (inv_type in ['out_invoice', 'out_refund'] and
+                self.partner_id.auto_update_account_income):
+            if self.account_id != self.partner_id.property_account_income:
+                self.partner_id.write({
+                    'property_account_income': self.account_id.id})
+        return super(AccountInvoiceLine, self)._onchange_account_id()

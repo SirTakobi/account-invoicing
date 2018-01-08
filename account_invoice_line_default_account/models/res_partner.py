@@ -1,46 +1,32 @@
 # -*- coding: UTF-8 -*-
-'''
-Created on 30 jan. 2013
+# Copyright 2012 Therp BV (<http://therp.nl>)
+# Copyright 2013-2018 BCIM SPRL (<http://www.bcim.be>)
 
-@author: Ronald Portier, Therp
-@contributor: Jacques-Etienne Baudoux, BCIM
-'''
-
-from openerp.osv import orm
-from openerp.osv import fields
+from odoo import models, fields
 
 
-class res_partner(orm.Model):
+class ResPartner(models.Model):
     _inherit = 'res.partner'
 
-    _columns = {
-        'property_account_income': fields.property(
-            obj_prop='account.account',
-            type='many2one',
-            relation='account.account',
-            string='Default Income Account',
-            domain='''[('user_type.report_type', '=', 'income')]''',
-            help='Default counterpart account for sales on invoice lines',
-            required=False),
-        'auto_update_account_income': fields.boolean(
-            'Autosave Selection on Invoice Line',
-            help='When an account is selected on an invoice line, '
-                 'automatically assign it as default income account'),
-        'property_account_expense': fields.property(
-            obj_prop='account.account',
-            type='many2one',
-            relation='account.account',
-            string='Default Expense Account',
-            domain='''[('user_type.report_type', '=', 'expense')]''',
-            help='Default counterpart account for purchases on invoice lines',
-            required=False),
-        'auto_update_account_expense': fields.boolean(
-            'Autosave Selection on Invoice Line',
-            help='When an account is selected on an invoice line, '
-                 'automatically assign it as default expense account'),
-    }
-
-    _defaults = {
-        'auto_update_account_income': True,
-        'auto_update_account_expense': True,
-    }
+    property_account_income = fields.Many2one(
+        'account.account',
+        string='Default Income Account',
+        domain='''[('user_type_id', '=', 'Income')]''',
+        help='Default counterpart account for sales on invoice lines',
+        company_dependent=True)
+    auto_update_account_income = fields.Boolean(
+        'Autosave Selection on Invoice Line',
+        help='When an account is selected on an invoice line, '
+             'automatically assign it as default income account',
+        default=True)
+    property_account_expense = fields.Many2one(
+        'account.account',
+        string='Default Expense Account',
+        domain='''[('user_type_id', '=', 'Expenses')]''',
+        help='Default counterpart account for purchases on invoice lines',
+        company_dependent=True)
+    auto_update_account_expense = fields.Boolean(
+        'Autosave Selection on Invoice Line',
+        help='When an account is selected on an invoice line, '
+             'automatically assign it as default expense account',
+        default=True)
