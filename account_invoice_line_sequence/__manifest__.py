@@ -16,6 +16,9 @@
     'data': ['views/account_invoice_view.xml',
              'views/report_invoice.xml'],
     'depends': ['account'],
+    'excludes': [
+        'account_invoice_line_default_account',
+    ],
     'post_init_hook': 'post_init_hook',
     'license': 'AGPL-3',
     'installable': True,
