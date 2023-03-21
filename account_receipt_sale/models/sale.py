@@ -127,6 +127,7 @@ class SaleOrder(models.Model):
             order._onchange_fiscal_position_id_receipts()
         return order
 
+
 class OrderLine(models.Model):
     _inherit = "sale.order.line"
 
